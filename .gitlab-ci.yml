@@ -1,0 +1,60 @@
+stages:
+  - test
+  - deploy
+
+análise de código fonte:
+  stage: test
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
+    GIT_DEPTH: "0"
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script:
+    - sonar-scanner
+      -Dsonar.projectKey=$SONAR_PROJECT_KEY
+      -Dsonar.qualitygate.wait=true
+      -Dsonar.host.url=$SONAR_HOST_URL
+      -Dsonar.sources=.
+      -Dsonar.projectBaseDir=.
+      -Dsonar.sourceEncoding=UTF-8
+      -Dsonar.scm.provider=git
+      -Dsonar.exclusions=node_modules
+      -Dsonar.test.exclusions=node_modules
+      -Dsonar.cpd.exclusions=node_modules
+      -Dsonar.login=$SONAR_TOKEN
+      -Dsonar.projectName=$CI_PROJECT_PATH
+  allow_failure: true
+  only:
+    - dev
+
+deploy amb. de desenvolvimento:
+  stage: deploy
+  script:
+    - docker build -t registry.conecthus.org.br/$CI_PROJECT_PATH:dev -f .build/Dockerfile .
+    - docker push registry.conecthus.org.br/$CI_PROJECT_PATH:dev
+    - /usr/local/bin/ds-updater $CI_PROJECT_PATH:dev
+  allow_failure: true
+  only:
+    - dev
+
+deploy amb. de teste:
+  stage: deploy
+  script:
+    - docker build -t registry.conecthus.org.br/$CI_PROJECT_PATH:test -f .build/Dockerfile .
+    - docker push registry.conecthus.org.br/$CI_PROJECT_PATH:test
+    - /usr/local/bin/ds-updater $CI_PROJECT_PATH:test
+  allow_failure: true
+  only:
+    - test
+
+deploy amb. de produção:
+  stage: deploy
+  script:
+    - docker build -t registry.conecthus.org.br/$CI_PROJECT_PATH:main -f .build/Dockerfile .
+    - docker push registry.conecthus.org.br/$CI_PROJECT_PATH:main
+    - /usr/local/bin/ds-updater $CI_PROJECT_PATH:main
+  allow_failure: true
+  only:
+    - main
